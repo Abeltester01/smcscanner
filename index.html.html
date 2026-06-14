@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forex SMC Scanner</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f0f; color: #e0e0e0; padding: 1.5rem; min-height: 100vh; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 12px; }
+.title { font-size: 20px; font-weight: 600; color: #fff; }
+.subtitle { font-size: 12px; color: #888; margin-top: 3px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: #1D9E75; display: inline-block; margin-right: 8px; animation: blink 1.5s infinite; }
+.controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn { padding: 8px 16px; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; cursor: pointer; font-size: 13px; color: #e0e0e0; font-family: inherit; transition: all 0.15s; }
+.btn:hover { background: #222; border-color: #555; }
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+.btn.green { border-color: #1D9E75; color: #1D9E75; }
+.btn.green.active { background: #0f2e22; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin-bottom: 1.5rem; }
+.stat { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 14px; }
+.stat-label { font-size: 11px; color: #666; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-val { font-size: 24px; font-weight: 600; color: #fff; }
+.stat-val.bull { color: #1D9E75; }
+.stat-val.bear { color: #D85A30; }
+.signals { display: flex; flex-direction: column; gap: 12px; }
+.signal-card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 16px; border-left: 3px solid transparent; }
+.signal-card.bull { border-left-color: #1D9E75; }
+.signal-card.bear { border-left-color: #D85A30; }
+.signal-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.pair-name { font-size: 18px; font-weight: 600; color: #fff; }
+.dir-badge { font-size: 12px; padding: 4px 12px; border-radius: 999px; font-weight: 600; }
+.dir-badge.bull { background: #0f2e22; color: #1D9E75; border: 1px solid #1D9E75; }
+.dir-badge.bear { background: #2e160f; color: #D85A30; border: 1px solid #D85A30; }
+.tf-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.tf-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; border: 1px solid #333; color: #888; background: #222; display: flex; align-items: center; gap: 5px; }
+.tf-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+.tf-pill.ok { border-color: #1D9E75; color: #1D9E75; }
+.tf-pill.ok .dot { background: #1D9E75; }
+.tf-pill.warn { border-color: #EF9F27; color: #EF9F27; }
+.tf-pill.warn .dot { background: #EF9F27; }
+.tf-pill.neutral .dot { background: #555; }
+.liq-box { padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 12px; }
+.liq-box.bull { background: #0f2e22; color: #1D9E75; border: 1px solid #1D9E75; }
+.liq-box.bear { background: #2e160f; color: #D85A30; border: 1px solid #D85A30; }
+.signal-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.detail-item { font-size: 12px; color: #666; }
+.detail-item span { display: block; font-size: 14px; color: #e0e0e0; font-weight: 500; margin-top: 3px; }
+.score-bar-wrap { margin-bottom: 12px; }
+.score-label { font-size: 11px; color: #666; margin-bottom: 5px; display: flex; justify-content: space-between; }
+.score-bar { height: 4px; background: #2a2a2a; border-radius: 2px; overflow: hidden; }
+.score-fill { height: 100%; border-radius: 2px; transition: width 0.6s; }
+.score-fill.bull { background: #1D9E75; }
+.score-fill.bear { background: #D85A30; }
+.empty { text-align: center; padding: 3rem; color: #555; font-size: 15px; line-height: 2; }
+.notif { border-radius: 8px; padding: 12px 16px; font-size: 13px; margin-bottom: 1rem; }
+.notif.success { background: #0f2e22; color: #1D9E75; border: 1px solid #1D9E75; }
+.notif.error { background: #2e160f; color: #D85A30; border: 1px solid #D85A30; }
+.notif.info { background: #1a1a1a; color: #888; border: 1px solid #333; }
+.countdown { font-size: 13px; color: #888; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 10px 14px; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.pulse { animation: blink 1s infinite; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="title"><span class="live-dot"></span>Forex SMC Scanner</div>
+    <div class="subtitle" id="lastScan">Cloudflare Proxy · Twelve Data · Telegram értesítés</div>
+  </div>
+  <div class="controls">
+    <button class="btn" id="scanBtn" onclick="runScan()">↻ Scan</button>
+    <button class="btn green" id="autoBtn" onclick="toggleAuto()">⏱ Auto (15p)</button>
+    <button class="btn" onclick="sendTest()">✈ Teszt üzenet</button>
+  </div>
+</div>
+
+<div id="notifBox"></div>
+<div id="countdownBox" style="display:none">
+  <div class="countdown"><span class="live-dot"></span> Auto-scan aktív — következő scan: <strong id="countdownVal">15:00</strong></div>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-label">Párok</div><div class="stat-val">4</div></div>
+  <div class="stat"><div class="stat-label">Setupok</div><div class="stat-val" id="statSetups">–</div></div>
+  <div class="stat"><div class="stat-label">Bullish</div><div class="stat-val bull" id="statBull">–</div></div>
+  <div class="stat"><div class="stat-label">Bearish</div><div class="stat-val bear" id="statBear">–</div></div>
+  <div class="stat"><div class="stat-label">Elküldve</div><div class="stat-val" id="statSent">0</div></div>
+</div>
+
+<div class="signals" id="signalsContainer">
+  <div class="empty">Nyomj <strong>Scan</strong>-re vagy kapcsold be az <strong>Auto (15p)</strong> módot<br><small>Az értesítések automatikusan mennek Telegramra</small></div>
+</div>
+
+<script>
+const PROXY    = 'https://floral-river-2915.balogabelalex.workers.dev';
+const TG_TOKEN = '8806121316:AAHQSrbWJIwFoGepty3xmfnKH8ZQVTULFWM';
+const TG_CHAT  = '2060498551';
+const TD_KEY   = '3136b2ad2f9f4576af4a3986275292dd';
+const PAIRS    = ['EUR/USD','GBP/USD','USD/JPY','XAU/USD'];
+const LABELS   = {'EUR/USD':'EURUSD','GBP/USD':'GBPUSD','USD/JPY':'USDJPY','XAU/USD':'XAUUSD'};
+
+let autoOn = false, countdownTimer = null, secondsLeft = 0, sentCount = 0;
+const sentSetups = new Set();
+
+function showNotif(msg, type='info') {
+  const box = document.getElementById('notifBox');
+  box.innerHTML = `<div class="notif ${type}">${msg}</div>`;
+  if (type !== 'error') setTimeout(() => box.innerHTML = '', 5000);
+}
+
+async function fetchCandles(symbol, interval, outputsize) {
+  const res = await fetch(PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'twelvedata', symbol, interval, outputsize, apikey: TD_KEY })
+  });
+  const data = await res.json();
+  if (data.status === 'error') throw new Error(data.message);
+  if (!data.values) throw new Error('Nincs adat');
+  return data.values.map(v => ({ o:+v.open, h:+v.high, l:+v.low, c:+v.close, t:v.datetime })).reverse();
+}
+
+async function sendTelegram(text) {
+  const res = await fetch(PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type: 'telegram', token: TG_TOKEN, chat_id: TG_CHAT, text })
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.description || 'Telegram hiba');
+  sentCount++;
+  document.getElementById('statSent').textContent = sentCount;
+}
+
+async function sendTest() {
+  showNotif('Teszt küldése...', 'info');
+  try {
+    await sendTelegram('✅ <b>SMC Scanner aktív!</b>\n\nProxy + Telegram OK!\n📊 EURUSD · GBPUSD · USDJPY · XAUUSD\n🔍 Swing High/Low BSL/SSL detektálás\n⏱ Auto-scan: 15 percenként');
+    showNotif('✅ Teszt elküldve! Ellenőrizd a Telegramodat!', 'success');
+  } catch(e) {
+    showNotif('❌ ' + e.message, 'error');
+  }
+}
+
+function calcEMA(candles, period) {
+  const k = 2/(period+1); let ema = candles[0].c;
+  for (let i=1; i<candles.length; i++) ema = candles[i].c*k + ema*(1-k);
+  return ema;
+}
+
+function detectStructure(candles) {
+  const n = candles.length; if (n < 10) return 'neutral';
+  const slice = candles.slice(-10);
+  const midH  = Math.max(...slice.slice(0,5).map(c=>c.h));
+  const lastH = Math.max(...slice.slice(5).map(c=>c.h));
+  const midL  = Math.min(...slice.slice(0,5).map(c=>c.l));
+  const lastL = Math.min(...slice.slice(5).map(c=>c.l));
+  if (lastH > midH && lastL > midL) return 'bull';
+  if (lastH < midH && lastL < midL) return 'bear';
+  return 'neutral';
+}
+
+function findSwingHighs(candles, lookback=5) {
+  const swings = [];
+  for (let i=lookback; i<candles.length-lookback; i++) {
+    const c = candles[i];
+    if (candles.slice(i-lookback,i).every(x=>x.h<=c.h) && candles.slice(i+1,i+lookback+1).every(x=>x.h<=c.h))
+      swings.push({ index:i, price:c.h, time:c.t });
+  }
+  return swings;
+}
+
+function findSwingLows(candles, lookback=5) {
+  const swings = [];
+  for (let i=lookback; i<candles.length-lookback; i++) {
+    const c = candles[i];
+    if (candles.slice(i-lookback,i).every(x=>x.l>=c.l) && candles.slice(i+1,i+lookback+1).every(x=>x.l>=c.l))
+      swings.push({ index:i, price:c.l, time:c.t });
+  }
+  return swings;
+}
+
+function findUnsweptHigh(candles, swingHighs) {
+  for (let s=swingHighs.length-1; s>=0; s--) {
+    const sw = swingHighs[s];
+    let swept = false;
+    for (let i=sw.index+1; i<candles.length; i++) {
+      if (candles[i].h > sw.price && candles[i].c > sw.price) { swept=true; break; }
+    }
+    if (!swept) return sw;
+  }
+  return null;
+}
+
+function findUnsweptLow(candles, swingLows) {
+  for (let s=swingLows.length-1; s>=0; s--) {
+    const sw = swingLows[s];
+    let swept = false;
+    for (let i=sw.index+1; i<candles.length; i++) {
+      if (candles[i].l < sw.price && candles[i].c < sw.price) { swept=true; break; }
+    }
+    if (!swept) return sw;
+  }
+  return null;
+}
+
+function detectLiqSweep(candles, dir, liqLevel) {
+  if (!liqLevel) return false;
+  const last = candles[candles.length-1];
+  if (dir==='bear') return last.h > liqLevel.price && last.c < liqLevel.price;
+  return last.l < liqLevel.price && last.c > liqLevel.price;
+}
+
+function detectFVG(candles, dir) {
+  const n = candles.length;
+  for (let i=n-4; i>=Math.max(0,n-15); i--) {
+    const [c1,c2,c3] = [candles[i],candles[i+1],candles[i+2]];
+    if (!c1||!c2||!c3) continue;
+    if (dir==='bull' && c3.l > c1.h) return { low:c1.h, high:c3.l };
+    if (dir==='bear' && c3.h < c1.l) return { low:c3.h, high:c1.l };
+  }
+  return null;
+}
+
+function fmt(v, sym) {
+  if (sym==='USD/JPY') return v.toFixed(3);
+  if (sym==='XAU/USD') return v.toFixed(2);
+  return v.toFixed(5);
+}
+
+async function analyzePair(symbol) {
+  const [h4, h1, m15, m1] = await Promise.all([
+    fetchCandles(symbol,'4h',100),
+    fetchCandles(symbol,'1h',60),
+    fetchCandles(symbol,'15min',20),
+    fetchCandles(symbol,'1min',5),
+  ]);
+  const price = m1[m1.length-1].c;
+  const ema200 = calcEMA(h4, Math.min(200, h4.length));
+  const emaDir = price > ema200 ? 'bull' : 'bear';
+  const structure = detectStructure(h4);
+  const trendAligned = emaDir === structure && structure !== 'neutral';
+  const dir = emaDir;
+
+  const swingHighs = findSwingHighs(h1, 5);
+  const swingLows  = findSwingLows(h1, 5);
+  const liqLevel = dir==='bear' ? findUnsweptHigh(h1, swingHighs) : findUnsweptLow(h1, swingLows);
+  const liqSwept = detectLiqSweep(h1, dir, liqLevel);
+  const fvg = detectFVG(h1, dir);
+  const m15confirm = detectStructure(m15) === dir;
+
+  const slDist = symbol==='XAU/USD' ? 15 : symbol==='USD/JPY' ? 0.30 : 0.0020;
+  const tpDist = slDist * 2.5;
+  const sl = dir==='bull' ? price-slDist : price+slDist;
+  const tp = dir==='bull' ? price+tpDist : price-tpDist;
+
+  let score = 0;
+  if (trendAligned) score += 35; else score += 10;
+  if (liqSwept) score += 35;
+  if (fvg) score += 20;
+  if (m15confirm) score += 10;
+
+  return {
+    symbol, dir, score,
+    isValid: score >= 65 && liqSwept && fvg,
+    trendAligned, emaDir, structure, liqSwept, fvg, m15confirm,
+    liqLevel, price, sl, tp, rr: (tpDist/slDist).toFixed(1),
+    h4trend: structure==='bull'?'Bullish':structure==='bear'?'Bearish':'Bizonytalan',
+    liqType: dir==='bear' ? 'Buyside Liq (BSL)' : 'Sellside Liq (SSL)',
+  };
+}
+
+function buildTgMsg(d) {
+  const fvgStr = d.fvg ? `${fmt(d.fvg.low,d.symbol)} – ${fmt(d.fvg.high,d.symbol)}` : '–';
+  const liqStr = d.liqLevel ? `${fmt(d.liqLevel.price,d.symbol)} (${d.liqLevel.time})` : '–';
+  return `${d.dir==='bull'?'🟢 LONG':'🔴 SHORT'} <b>${LABELS[d.symbol]}</b>\n\n`+
+    `💰 Ár: <b>${fmt(d.price,d.symbol)}</b>\n`+
+    `🎯 ${d.liqType}: ${liqStr} ✅ SWEPT\n`+
+    `📐 FVG: ${fvgStr}\n`+
+    `🛑 SL: ${fmt(d.sl,d.symbol)}\n`+
+    `✅ TP: ${fmt(d.tp,d.symbol)}\n`+
+    `⚖️ R:R = 1:${d.rr}\n\n`+
+    `H4 trend: ${d.h4trend}\n`+
+    `M15 struktúra: ${d.m15confirm?'✅':'❌'}\n`+
+    `Setup erő: <b>${d.score}%</b>`;
+}
+
+function tfPill(label, state) {
+  return `<div class="tf-pill ${state}"><div class="dot"></div>${label}</div>`;
+}
+
+function renderCard(d) {
+  const fvgStr = d.fvg ? `${fmt(d.fvg.low,d.symbol)} – ${fmt(d.fvg.high,d.symbol)}` : '–';
+  const liqStr = d.liqLevel ? fmt(d.liqLevel.price, d.symbol) : '–';
+  const liqTime = d.liqLevel ? d.liqLevel.time : '';
+  return `<div class="signal-card ${d.dir}">
+    <div class="signal-top">
+      <div class="pair-name">${LABELS[d.symbol]}</div>
+      <span class="dir-badge ${d.dir}">${d.dir==='bull'?'▲ Long':'▼ Short'} setup</span>
+    </div>
+    <div class="tf-row">
+      ${tfPill('H4 EMA', d.emaDir===d.dir?'ok':'warn')}
+      ${tfPill('H4 struktúra', d.structure===d.dir?'ok':'warn')}
+      ${tfPill(d.liqType, d.liqSwept?'ok':'warn')}
+      ${tfPill('H1 FVG', d.fvg?'ok':'warn')}
+      ${tfPill('M15', d.m15confirm?'ok':'neutral')}
+      ${tfPill('M1 entry', 'neutral')}
+    </div>
+    <div class="liq-box ${d.dir}">
+      <strong>${d.liqType}</strong>: ${liqStr} <span style="opacity:0.6;font-size:11px">${liqTime}</span><br>
+      ${d.liqSwept ? '→ SWEPT ✅' : '→ Várakozás...'}
+    </div>
+    <div class="signal-details">
+      <div class="detail-item">Jelenlegi ár<span>${fmt(d.price,d.symbol)}</span></div>
+      <div class="detail-item">FVG zóna<span>${fvgStr}</span></div>
+      <div class="detail-item">Stop Loss<span>${fmt(d.sl,d.symbol)}</span></div>
+      <div class="detail-item">Take Profit<span>${fmt(d.tp,d.symbol)}</span></div>
+      <div class="detail-item">R:R arány<span>1 : ${d.rr}</span></div>
+      <div class="detail-item">Setup erő<span>${d.score}%</span></div>
+    </div>
+    <div class="score-bar-wrap">
+      <div class="score-label"><span>Setup minőség</span><span>${d.score}%</span></div>
+      <div class="score-bar"><div class="score-fill ${d.dir}" style="width:${d.score}%"></div></div>
+    </div>
+  </div>`;
+}
+
+async function runScan(silent=false) {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = '↻ Scan...';
+  if (!silent) document.getElementById('signalsContainer').innerHTML = '<div class="empty">Adatok letöltése...<br><small>EURUSD · GBPUSD · USDJPY · XAUUSD</small></div>';
+  try {
+    const results = [];
+    for (const pair of PAIRS) {
+      try { results.push(await analyzePair(pair)); await new Promise(r=>setTimeout(r,300)); }
+      catch(e) { console.warn(pair, e.message); }
+    }
+    const valid = results.filter(r=>r.isValid);
+    document.getElementById('statSetups').textContent = valid.length;
+    document.getElementById('statBull').textContent = valid.filter(r=>r.dir==='bull').length;
+    document.getElementById('statBear').textContent = valid.filter(r=>r.dir==='bear').length;
+    document.getElementById('lastScan').textContent = 'Utolsó scan: ' + new Date().toLocaleTimeString('hu-HU');
+
+    for (const d of valid) {
+      const key = `${d.symbol}-${d.dir}-${new Date().getHours()}`;
+      if (!sentSetups.has(key)) {
+        sentSetups.add(key);
+        try { await sendTelegram(buildTgMsg(d)); if(!silent) showNotif(`📨 Telegram: ${LABELS[d.symbol]} elküldve!`, 'success'); }
+        catch(e) { console.warn('TG:', e.message); }
+      }
+    }
+
+    const c = document.getElementById('signalsContainer');
+    if (!results.length) {
+      c.innerHTML = '<div class="empty">API hiba – próbáld újra</div>';
+    } else if (!valid.length) {
+      const best = results.sort((a,b)=>b.score-a.score)[0];
+      c.innerHTML = '<div class="empty" style="margin-bottom:12px">Nincs teljes setup most – legjobb jelölt:</div>' + renderCard(best);
+    } else {
+      c.innerHTML = valid.sort((a,b)=>b.score-a.score).map(renderCard).join('');
+    }
+  } catch(e) { if(!silent) showNotif('Hiba: ' + e.message, 'error'); }
+  btn.disabled = false; btn.textContent = '↻ Scan';
+}
+
+function startCountdown(sec) {
+  secondsLeft = sec; clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    secondsLeft--;
+    const m = String(Math.floor(secondsLeft/60)).padStart(2,'0');
+    const s = String(secondsLeft%60).padStart(2,'0');
+    document.getElementById('countdownVal').textContent = `${m}:${s}`;
+    if (secondsLeft <= 0) { runScan(true); startCountdown(900); }
+  }, 1000);
+}
+
+function toggleAuto() {
+  const btn = document.getElementById('autoBtn');
+  if (autoOn) {
+    clearInterval(countdownTimer); autoOn = false;
+    btn.classList.remove('active');
+    btn.textContent = '⏱ Auto (15p)';
+    document.getElementById('countdownBox').style.display = 'none';
+  } else {
+    autoOn = true; btn.classList.add('active');
+    btn.textContent = '⏱ Auto: BE';
+    document.getElementById('countdownBox').style.display = 'block';
+    runScan(false); startCountdown(900);
+  }
+}
+</script>
+</body>
+</html>
